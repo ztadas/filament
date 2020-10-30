@@ -48,6 +48,7 @@ if [[ "$1" == "build" ]] && [[ "$2" == "swiftshader" ]]; then
     docker exec --workdir /trees/swiftshader runner mkdir build
     docker exec --workdir /trees/swiftshader/build runner cmake -GNinja -DCMAKE_BUILD_TYPE="$BUILD_TYPE" ..
     docker exec --workdir /trees/swiftshader/build runner ninja
+    docker exec --workdir /trees/swiftshader runner find . -type f -not -name 'libvk*' -delete
     exit $?
 fi
 
@@ -96,7 +97,6 @@ fi
 
 # Notes on options being passed to docker's run command:
 #
-# - The memory constraint seems to prevent an OOM signal in GitHub Actions.
 # - The cap / security args allow use of lldb and creation of core dumps.
 # - The privileged arg allows use of dmesg for examining OOM logs.
 #
@@ -107,8 +107,6 @@ fi
 if [[ "$1" == "start" ]]; then
     mkdir -p results
     docker run --tty --rm --detach --privileged \
-          --memory 4.0g \
-          --memory-swap 6.0g \
           --name runner \
           --cap-add=SYS_PTRACE \
           --security-opt seccomp=unconfined \

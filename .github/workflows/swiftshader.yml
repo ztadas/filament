@@ -12,7 +12,7 @@ on:
 jobs:
   swiftshader:
     name: Test Filament + Vulkan + SwiftShader
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
 
     - uses: actions/checkout@v2.0.0
@@ -24,20 +24,17 @@ jobs:
       run: build/swiftshader/test.sh start
 
     - name: Build SwiftShader
-      continue-on-error: true
+      # continue-on-error: true
       run: build/swiftshader/test.sh build swiftshader debug
 
     - name: Build Filament
-      continue-on-error: true
-      run: build/swiftshader/test.sh build filament release
+      # continue-on-error: true
+      run: build/swiftshader/test.sh build filament debug
 
     - name: Test Filament with SwiftShader
-      continue-on-error: true
-      timeout-minutes: 15
+      # continue-on-error: true
+      timeout-minutes: 30
       run: build/swiftshader/test.sh run
-
-    - name: Dump Memory Logs
-      run: build/swiftshader/test.sh logs
 
     - uses: actions/upload-artifact@v2
       with:
