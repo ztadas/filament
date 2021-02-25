@@ -1,5 +1,6 @@
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
+apply plugin: 'com.google.gms.google-services'
 apply plugin: FilamentToolsPlugin
 
 project.ext.isSample = true
@@ -32,6 +33,8 @@ android {
 }
 
 dependencies {
+    implementation platform('com.google.firebase:firebase-bom:26.5.0')
+    implementation 'com.google.firebase:firebase-analytics-ktx'
     implementation deps.kotlin
     implementation project(':filament-android')
     implementation project(':gltfio-android')

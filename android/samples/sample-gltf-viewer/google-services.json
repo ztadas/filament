@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "867987854859",
+    "project_id": "filament-test",
+    "storage_bucket": "filament-test.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:867987854859:android:aee1512c1d76d04161590e",
+        "android_client_info": {
+          "package_name": "com.google.android.filament.gltf"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "867987854859-j645tb4m72qt29m90hciigd9jood22nh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPykUQ5cHVBdsMylQlKoQC2VEMUoPGug8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "867987854859-j645tb4m72qt29m90hciigd9jood22nh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

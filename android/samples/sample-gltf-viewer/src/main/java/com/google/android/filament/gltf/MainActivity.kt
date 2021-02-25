@@ -19,6 +19,8 @@ package com.google.android.filament.gltf
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Choreographer
 import android.view.GestureDetector
 import android.view.MotionEvent
@@ -72,6 +74,12 @@ class MainActivity : Activity() {
         val bloomOptions = modelViewer.view.bloomOptions
         bloomOptions.enabled = true
         modelViewer.view.bloomOptions = bloomOptions
+
+        // If this is launched in a test suite, close the app after 10 seconds.
+        val launchIntent = intent
+        if (launchIntent.action == "com.google.intent.action.TEST_LOOP") {
+            Handler(Looper.getMainLooper()).postDelayed( { this.finish() }, 10000)
+        }
     }
 
     private fun createRenderables() {
