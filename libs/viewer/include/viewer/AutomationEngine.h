@@ -31,12 +31,14 @@ namespace viewer {
  * Provides a convenient way to iterate through an AutomationSpec while pushing settings to Filament
  * and exporting screenshots.
  *
- * Upon construction, the engine is given an immutable reference to an AutomationSpec. The engine is
- * always in one of two states: running or idle. The running state can be entered either immediately
- * (startRunning) or by requesting batch mode (startBatchMode).
+ * Upon construction, the automation engine is given an immutable reference to an AutomationSpec.
+ * The engine is always in one of two states: running or idle. The running state can be entered
+ * either immediately (startRunning) or by requesting batch mode (startBatchMode).
  *
  * Clients must call tick() after each frame is rendered, which gives the engine an opportunity to
- * increment the current test (if enough time has elapsed) and request an asychronous screenshot.
+ * push settings to Filament, increment the current test index (if enough time has elapsed), and
+ * request an asychronous screenshot.
+ *
  * The time to sleep between tests is configurable and can be set to zero. The engine also waits a
  * specified minimum number of frames between tests.
  *
@@ -47,59 +49,137 @@ namespace viewer {
  */
 class AutomationEngine {
 public:
+    /**
+     * Allows users to toggle screenshots, change the sleep duration between tests, etc.
+     */
+    struct Options {
+        /**
+         * Minimum time that the engine waits between applying a settings object and subsequently
+         * taking a screenshot. After the screenshot is taken, the engine immediately advances to
+         * the next test case. Specified in seconds.
+         */
+        float sleepDuration = 0.2;
+
+        /**
+         * Similar to sleepDuration, but expressed as a frame count. Both the minimum sleep time
+         * and the minimum frame count must be elapsed before the engine advances to the next test.
+         */
+        int minFrameCount = 2;
+
+        /**
+         * If true, test progress is dumped to the utils Log (info priority).
+         */
+        bool verbose = true;
+
+        /**
+         * If true, the tick function writes out a screenshot before advancing to the next test.
+         */
+        bool exportScreenshots = false;
+
+        /**
+         * If true, the tick function writes out a settings JSON file before advancing.
+         */
+        bool exportSettings = false;
+    };
+
+    /**
+     * Creates an automation engine and places it in an idle state.
+     *
+     * @param spec     Specifies a set of settings permutations (owned by the client).
+     * @param settings Client-owned settings object. This not only supplies the initial
+     *                 state, it also receives changes during tick(). This is useful when
+     *                 building automation into an application that has a settings UI.
+     *
+     * @see setOptions
+     * @see startRunning
+     */
     AutomationEngine(const AutomationSpec* spec, Settings* settings) :
             mSpec(spec), mSettings(settings) {}
 
-    // Enters the running state.
+    /**
+     * Shortcut constructor that creates an automation engine from a JSON string.
+     *
+     * This constructor can be used if the user does not need to monitor how the settings
+     * change over time and does not need ownership over the AutomationSpec.
+     *
+     * @param jsonSpec Valid JSON string that conforms to the automation schema.
+     * @param size     Number of characters in the JSON string.
+     * @return         Automation engine or null if unable to read the JSON.
+     */
+    static AutomationEngine* createFromJSON(const char* jsonSpec, size_t size);
+
+    /**
+     * Creates an automation engine for the default test sequence.
+     *
+     * To see how the default test sequence is generated, search for DEFAULT_AUTOMATION.
+     */
+    static AutomationEngine* createDefaultTest();
+
+    ~AutomationEngine();
+
+    /**
+     * Activates automation. During the subsequent call to tick(), the first test is applied
+     * and the engine enters the running state.
+     */
     void startRunning();
 
-    // Enters the running state in batch mode.
+    /**
+     * Activates automation, but enters a paused state until the user calls signalBatchMode().
+     */
     void startBatchMode();
 
-    // Notifies the engine that time has passed and a new frame has been rendered.
-    // This is when settings get applied, screenshots are (optionally) exported, etc.
+    /**
+     * Notifies the automation engine that time has passed and a new frame has been rendered.
+     *
+     * This is when settings get applied, screenshots are (optionally) exported, etc.
+     *
+     * @param view          The Filament View that automation pushes changes to.
+     * @param materials     An optional set of of materials that can receive parameter tweaks.
+     * @param materialCount The number of items in the materials array.
+     * @param renderer      The Filament Renderer that can be used to take screenshots.
+     * @param deltaTime     The amount of time that has passed since the previous tick in seconds.
+     */
     void tick(View* view, MaterialInstance* const* materials, size_t materialCount,
             Renderer* renderer, float deltaTime);
 
-    // Signals that batch mode can begin. Call this after all meshes and textures finish loading.
+    /**
+     * Signals that batch mode can begin. Call this after all meshes and textures finish loading.
+     */
     void signalBatchMode() { mBatchModeAllowed = true; }
 
-    // Cancels an in-progress automation session.
+    /**
+     * Cancels an in-progress automation session.
+     */
     void stopRunning() { mIsRunning = false; }
 
-    // Signals that the application is closing, so all pending screenshots should be cancelled.
+    /**
+     * Signals that the application is closing, so all pending screenshots should be cancelled.
+     */
     void terminate();
 
-    // Convenience function that writes out a JSON file to disk.
-    static void exportSettings(const Settings& settings, const char* filename);
-
-    struct Options {
-        // Minimum time that the engine waits between applying a settings object and subsequently
-        // taking a screenshot. After the screenshot is taken, the engine immediately advances to
-        // the next test case. Specified in seconds.
-        float sleepDuration = 0.2;
-
-        // If true, the tick function writes out a screenshot before advancing to the next test.
-        bool exportScreenshots = false;
-
-        // If true, the tick function writes out a settings JSON file before advancing.
-        bool exportSettings = false;
-
-        // Similar to sleepDuration, but expressed as a frame count. Both the minimum sleep time
-        // and the minimum frame count must be elapsed before the engine advances to the next test.
-        int minFrameCount = 2;
-
-        // If true, test progress is dumped to the utils Log (info priority).
-        bool verbose = true;
-    };
-
-    Options getOptions() const { return mOptions; }
+    /**
+     * Configures the automation engine for users who wish to set up a custom sleep time
+     * between tests, etc.
+     */
     void setOptions(Options options) { mOptions = options; }
 
+    /**
+     * Returns true if automation is in batch mode and all tests have finished.
+     */
+    bool shouldClose() const { return mShouldClose; }
+
+    /**
+     * Convenience function that writes out a JSON file to disk containing all settings.
+     *
+     * @param Settings State vector to serialize.
+     * @param filename Desired JSON filename.
+     */
+    static void exportSettings(const Settings& settings, const char* filename);
+
+    Options getOptions() const { return mOptions; }
     bool isRunning() const { return mIsRunning; }
     size_t currentTest() const { return mCurrentTest; }
     size_t testCount() const { return mSpec->size(); }
-    bool shouldClose() const { return mShouldClose; }
     bool isBatchModeEnabled() const { return mBatchModeEnabled; }
     const char* getStatusMessage() const;
 
@@ -116,6 +196,7 @@ private:
     bool mShouldClose = false;
     bool mBatchModeAllowed = false;
     bool mTerminated = false;
+    bool mOwnsSettings = false;
 
 public:
     // For internal use from a screenshot callback.
