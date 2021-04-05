@@ -78,6 +78,40 @@ MetalDriver::MetalDriver(backend::MetalPlatform* platform) noexcept
                   << [mContext->device.name cStringUsingEncoding:NSUTF8StringEncoding] << "'"
                   << utils::io::endl;
 
+    utils::slog.i << "Supports GPU families:" << utils::io::endl;
+    if ([mContext->device supportsFamily:MTLGPUFamilyCommon1]) {
+        utils::slog.i << "    MTLGPUFamilyCommon1" << utils::io::endl;
+    }
+    if ([mContext->device supportsFamily:MTLGPUFamilyCommon2]) {
+        utils::slog.i << "    MTLGPUFamilyCommon2" << utils::io::endl;
+    }
+    if ([mContext->device supportsFamily:MTLGPUFamilyCommon3]) {
+        utils::slog.i << "    MTLGPUFamilyCommon3" << utils::io::endl;
+    }
+    if ([mContext->device supportsFamily:MTLGPUFamilyMac1]) {
+        utils::slog.i << "    MTLGPUFamilyMac1" << utils::io::endl;
+    }
+    if ([mContext->device supportsFamily:MTLGPUFamilyMac2]) {
+        utils::slog.i << "    MTLGPUFamilyMac2" << utils::io::endl;
+    }
+
+    utils::slog.i << "Supports GPU feature sets:" << utils::io::endl;
+    if ([mContext->device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v1]) {
+        utils::slog.i << "    MTLFeatureSet_macOS_GPUFamily1_v1" << utils::io::endl;
+    }
+    if ([mContext->device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v2]) {
+        utils::slog.i << "    MTLFeatureSet_macOS_GPUFamily1_v2" << utils::io::endl;
+    }
+    if ([mContext->device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v3]) {
+        utils::slog.i << "    MTLFeatureSet_macOS_GPUFamily1_v3" << utils::io::endl;
+    }
+    if ([mContext->device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v4]) {
+        utils::slog.i << "    MTLFeatureSet_macOS_GPUFamily1_v4" << utils::io::endl;
+    }
+    if ([mContext->device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1]) {
+        utils::slog.i << "    MTLFeatureSet_macOS_GPUFamily2_v1" << utils::io::endl;
+    }
+
     mContext->commandQueue = [mContext->device newCommandQueue];
     mContext->commandQueue.label = @"Filament";
     mContext->pipelineStateCache.setDevice(mContext->device);
