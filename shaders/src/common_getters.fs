@@ -71,3 +71,9 @@ float getExposure() {
 float getEV100() {
     return frameUniforms.ev100;
 }
+
+#if defined(HAS_SHADOWING)
+mat4 getSpotLightFromWorldMatrix(uint index) {
+    return shadowUniforms.spotLightFromWorldMatrix[index];
+}
+#endif

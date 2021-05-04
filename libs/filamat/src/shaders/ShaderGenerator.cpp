@@ -418,6 +418,10 @@ std::string ShaderGenerator::createFragmentProgram(filament::backend::ShaderMode
             BindingPoints::PER_VIEW, UibGenerator::getPerViewUib());
     cg.generateUniforms(fs, ShaderType::FRAGMENT,
             BindingPoints::PER_RENDERABLE, UibGenerator::getPerRenderableUib());
+    if (litVariants && variant.hasShadowReceiver()) {
+        cg.generateUniforms(fs, ShaderType::FRAGMENT,
+                BindingPoints::SHADOW, UibGenerator::getShadowUib());
+    }
     cg.generateUniforms(fs, ShaderType::FRAGMENT,
             BindingPoints::LIGHTS, UibGenerator::getLightsUib());
     cg.generateUniforms(fs, ShaderType::FRAGMENT,
