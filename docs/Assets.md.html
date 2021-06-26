@@ -1,7 +1,6 @@
 <meta charset="utf-8">
 <link href="https://fonts.googleapis.com/css?family=Montserrat" rel="stylesheet">
 <style>
-    img { max-width: 100px !important }
     .md, body, .md h1, .md div.title, .md a  {
         font-family: "Montserrat", sans-serif;
         color: #555;
@@ -10,24 +9,69 @@
     .md a  { color: #55a }
 </style>
 
-**Vulkan Backend**
-          *Last updated: 26 June 2021*
+**Filament glTF Ecosystem**
 
-![](../../docs/images/filament_logo.png)
+![](images/filament_logo.png width=150px)
 
 -----
 
-This document is a high-level "state of the union" for Filament's Vulkan backend. Some of the
-details may be out of date by the time you read it, but we hope to keep it reasonably well
-maintained, which is why it lives as a markdown document in our source tree.
+The core Filament renderer is developed in tandem with a set of auxiliary libraries that can load
+and animate glTF assets, in both **gltf** and **glb** file formats. 
 
-# Architecture
+- Much like Filament itself, Android, iOS, Web, macOS, Linux, and Windows platforms are all
+  supported, using any of our backends (Metal, Vulkan, and OpenGL / WebGL).
+- For Android and Web platforms, we provide platform-specific viewer helpers that make the library
+  especially easy to use.
+- On Android and iOS, we provide a remote control interface whereby an asset can be dragged into a
+  web page, and various settings can be toggled via the user interface.
+- For all desktop platforms, we provide a gltf_viewer application that sports the same UI as the
+  remote control interface.
+- Two modes for material management are supported, **ubershader mode** and **generator mode**.
+  The former allows for fast loading but at the cost of increased shader complexity. The latter
+  involves run-time compilation and therefore has dependencies on additional libraries such as
+  glslang and spirv-tools. (By default, our Android and Web builds support ubershader mode only;
+  they do not include generator functionality.)
+- Ubershader mode can be built in a "lite" configuration which supports fewer features but has
+  a much smaller footprint.
+- Clients can also provide their custom *material provider* if neither the ubershader or generator
+  modes suit their needs.
 
-At a high level, the Vulkan backend is composed of the **driver**, a set of **helpers**, and
-a set of **handle types**.
+# Limitations
 
-The driver is responsible for implementing all `DriverAPI` entry points, as well as managing a
-single `VkDevice` and `VkInstance`.
+Filament's glTF libraries are not suitable for clients that require the ability to perform
+fine-grained manipulation of live scene graphs (e.g. 3D modeling software). However they are a good
+fit for generic model viewers or applications that need simple loading and animation functionality.
+
+Our glTF libraries have a high level of conformance, with a few exceptions, such as:
+
+- Some rarely used primitive types are not supported (line loops and strips, triangle fans and
+  strips).
+- For morph animation, up to 255 morph targets are supported, but only the four most influential
+  targets are honored at any given time slice.
+- Filament can use only a limited number of texture samplers. If several glTF extensions are used
+  simultaneously, these limits can cause some texture layers to be dropped.
+
+See the [feature list](#featurelist) section for more details.
+
+# Layers
+
+On Android, the glTF ecosystem is comprised of the middle two layers in the following diagram.
+The gray boxes are hidden from clients who choose to use *ModelViewer*, our high level asset viewing
+utility for Java and Kotlin clients.
+
+![](https://miro.medium.com/max/1400/1*zyNugWltwkU7XTr3zJE12Q.png)
+
+For browser-based clients, we provide an experimental
+[web component](https://www.webcomponents.org/introduction) called **FilamentViewer**. This supports
+a one-line loading functionality, as in:
+
+```html
+<filament-viewer src="https://prideout.net/models/CesiumMan.glb" ibl="kansas.ktx" />
+```
+
+Additionally, **FilamentViewer** supports drag-and-drop and animation.
+
+More generally, on all platforms, the **gltfio** library is comprised of the following pieces.
 
 ************************************************************************************************
 *                                                                                              *
@@ -39,177 +83,53 @@ single `VkDevice` and `VkInstance`.
 *   .----------------------------------------.     .--------------------------------------.    *
 *  |        Filament Rendering Engine         |   |          filament::SwapChain           |   *
 *   '------------------+---------------------'     '------------------+-------------------'    *
-*                      |                                              |                        *
-*                      v                                              v                        *
-*   .----------------------------------------.     .---------------------------------------.   *
-*  |                                          |   |                                         |  *
-*  |       VulkanDriver : DriverBase          |   |     VulkanSwapChain : HwSwapChain       |  *
-*  |                                          |   |                                         |  *
-*  |------------------------------------------|   |-----------------------------------------|  *
-*  |                                          |   |                                         |  *
-*  |    Helpers            VulkanContext      |   |    SwapContext       SwapContext        |  *
-*  |  .--------------.    .---------------.   |   |   .----------------+----------------.   |  *
-*  |  | PipelineCache|   | VkDevice        |  |   |  | VkImage         | VkImage         |  |  *
-*  |  +--------------+   | VkInstance      |  |   |  | VkImageView     | VkImageView     |  |  *
-*  |  | Disposer     |   | VulkanCommands  |  |   |  |                 |                 |  |  *
-*  |  +--------------+    '---------------'   |   |   '----------------+----------------'   |  *
-*  |  | FboCache     |                        |   |                                         |  *
-*  |  +--------------+                        |   |                                         |  *
-*  |  | SamplerCache |                        |   |                                         |  *
-*  |  +--------------+                        |   |                                         |  *
-*  |  | StagePool    |                        |    '---------------------------------------'   *
-*  |  '--------------'                        |                                                *
-*  |                                          |                                                *
-*  |                                          |                                                *
-*  |                                          |                                                *
-*   '----------------------------------------'                                                 *
 *                                                                                              *
 ************************************************************************************************
 
-# Overview
+# Feature list
 
-## VulkanDriver and VulkanContext
+- Encodings
+    - [x] Embeded
+    - [x] Binary
 
-The `VulkanDriver` class is the bridge between the backend and the Filament engine, and is kept as
-minimal as possible. Most of the actual logic is contained in methods in `VulkanContext` and in the
-handle types rather than directly in `VulkanDriver`.
+- Primitive Types
+    - [x] Points
+    - [x] Lines
+    - [ ] Line Loop
+    - [ ] Line Strip
+    - [x] Triangles
+    - [ ] Triangle Strip
+    - [ ] Triangle Fan
 
-In a self-imposed design constraint, we have decided that every method in `VulkanDriver` must be an
-override; it should have no private methods other than the handle allocators. This reins in
-complexity because it must implement every method in `DriverAPI` while dealing with Vulkan itself,
-which has an extremely low-level API.
+- Animation
+    - [x] Transform animation
+    - [x] Cubic interpolation
+    - [x] Morph animation
+        - [x] Sparse accessor
+    - [x] Skin animation
 
-## Command buffers
+- Extensions
+    - [x] KHR_draco_mesh_compression
+    - [x] KHR_lights_punctual
+    - [x] KHR_materials_clearcoat
+    - [x] KHR_materials_pbrSpecularGlossiness
+    - [x] KHR_materials_sheen
+    - [x] KHR_materials_transmission
+    - [x] KHR_materials_unlit
+    - [x] KHR_mesh_quantization
+    - [x] KHR_texture_transform
 
-The `VulkanCommands` class creates command buffers on the fly and maintains a chain of semaphores
-to ensure that submitted command buffers are executed serially.
+In lite ubershader mode, Filament supports the following extensions:
 
-## Handle types
+    - [x] KHR_materials_unlit
 
-This sole purpose of `VulkanHandles.h` is to declare structs that descend from the hardware handles
-that are defined in `DriverBase.h`.
+Additionally, in the future, we are considering adding support for the following extensions.
 
-Most of the handle types do not contain much logic, but they often do more than mere wrapping of
-Vk objects. Notably, `VulkanRenderTarget` does not have a straightforward mapping to any one Vk
-object. See its class comment for details.
-
-VulkanProgram
-: Descends from `HwProgram`, owns a pair of `VkShaderModule`.
-
-VulkanRenderTarget
-: Descends from `HwRenderTarget`, contains references to `VkImage` objects.
-
-VulkanSwapChain
-: Descends from `HwSwapChain`, has a reference to `VkSurfaceKHR` and `VkSwapchainKHR`.
-
-VulkanVertexBuffer
-: Descends from `HwVertexBuffer`, owns a set of `VkBuffer`.
-
-VulkanIndexBuffer
-: Descends from `HwIndexBuffer`, owns a `VkBuffer`.
-
-VulkanUniformBuffer
-: Descends from `HwUniformBuffer`, owns a `VkBuffer`.
-
-VulkanSamplerGroup
-: Descends from `HwSamplerGroup`, does not own Vk objects.
-
-VulkanTexture
-: Descends from `HwTexture`, owns a `VkImage` and a set of `VkImageLayout`.
-
-VulkanRenderPrimitive
-: Descends from `HwRenderPrimitive`, does not own Vk objects.
-
-One special case is `VulkanBuffer`, which is not a handle class. It encapulates functionality shared
-between `VulkanIndexBuffer` and `VulkanVertexBuffer`.
-
-## Helpers
-
-`VulkanDriver` owns one instance of each helper. They are not part of a class hierarchy but
-they do follow a common set of conventions. For example, most of them implement a `gc()` method
-that is called once per frame to free unused objects.
-
-VulkanPipelineCache
-: Cache of VkDescriptorSet and VkPipeline.
-
-VulkanDisposer
-: Holds reference counts to Vulkan objects in order to defer their destruction.
-
-VulkanFboCache
-: Cache of VkRenderPass and VkFramebuffer. Contains weak references to VkImage handles, but does not
-  own any pixel data.
-
-VulkanStagePool
-: Pool of VkBuffer objects that can be memory mapped (shared between host and device).
-
-VulkanSamplerCache
-: This is our simplest cache object because Vulkan samplers are fairly lightweight and re-usable.
-
-## Folder layout and namespacing
-
-With the exception of BlueVK, all Vulkan-specific code lives in `backend/src/vulkan`, which has
-no subfolders. All backend-specific types and functions live directly in the `filament::backend`
-namespace, and we simply prefix our names with "Vulkan" when necessary to avoid ambiguation with
-OpenGL.
-
-# VulkanPipelineCache
-
-Uniforms, samplers, and shaders are not directly bindable in Vulkan; instead they are bound through
-indirection layers called *pipelines* and *descriptor sets*. The `VulkanPipelineCache` class allows
-the driver to call methods that are conceptually simple like `bindUniformBuffer`, even though no
-such function exists in the low-level Vulkan API.
-
-Although it is actually just another cache manager, `VulkanPipelineCache` has a fairly rich set of
-public methods. See its header file for details.
-
-The pipeline cache also manages the *layout objects*, which constrain the number of uniform buffers
-and samplers that can be bound simultaneously (see `VkDescriptorSetLayout` and `VkPipelineLayout`).
-Here we take advantage of Filament's opinionated shading model in order to keep things simple, which
-allows us to create only one layout for the entire lifetime of the app.
-
-# Memory Allocation
-
-Some architectures (e.g. Adreno) only allow a small number of `VkDeviceMemory` objects to exist at
-once, so we consolidate these using a simple third-party library
-([vk_mem_alloc](https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator)). This library is
-used each time the backend needs to create a `VkBuffer` or `VkImage`. See `VulkanStagePool` for a
-usage example.
-
-# BlueVK
-
-BlueVK loads in functions for all Vulkan entry points and supported extensions. On Android, this
-is not absolutely necessary since core functionality is available through static linking. However,
-we found that in practice it is simpler to use BlueVK across all platforms because of its ability
-to load extensions.
-
-The BlueVK C++ source is generated from a Python script that consumes `vk.xml`. This XML file is an
-API specification maintained by Khronos on GitHub.
-
-None of the source files in the  Vulkan backend include `vulkan.h` directly,  instead they include
-the BlueVK header, which in turn includes the Vulkan headers.
-
-!!! Note
-    Each time we update BlueVK by feeding it the latest `vk.xml`, we should also update the
-    Vulkan headers that are checked in to `libs/bluevk/include/vulkan`. If BlueVK and the Vulkan
-    headers are not updated concurrently, this will cause build errors.
-
-# Top Issues
-
-Here we list some of the most significant issues and to-be-done items for the Vulkan backend.
-
-- Improve the UBO strategy
-    - Currently we use staging buffers and perform lots of copies (host-to-host, then host-to-device)
-    - Consider an approach similar to MetalDriver, which effectively implements double-buffering using a pool of shared mem buffers
-- Consider using subpasses for the depth prepass
-- We lazily create pipeline objects
-        1. This is notoriously slow in Vulkan
-        2. We do lots of state hashing for this
-        3. Vulkan has special pipeline cache objects that we aren't using yet, but...
-        4. It might be better to enhance our driver API to allow a priori construction
-- We need more automated testing
-- We don't *quite* have feature parity with the OpenGL backend
-    - No support for streaming camera texture yet
-        - This is possible, even in Android O, just haven't gotten around to it yet
+    - [ ] KHR_xmp
+    - [ ] KHR_materials_variants
+    - [ ] KHR_texture_basisu
+    - [ ] EXT_lights_image_based
+    - [ ] EXT_meshopt_compression
 
 <script src="https://casual-effects.com/markdeep/latest/markdeep.min.js"></script>
 <script>window.alreadyProcessedMarkdeep||(document.body.style.visibility="visible")</script>
