@@ -119,12 +119,14 @@ class ModelViewer(val engine: Engine) : android.view.View.OnTouchListener {
         light = EntityManager.get().create()
 
         val (r, g, b) = Colors.cct(6_500.0f)
-        LightManager.Builder(LightManager.Type.DIRECTIONAL)
-                .color(r, g, b)
-                .intensity(100_000.0f)
-                .direction(0.0f, -1.0f, 0.0f)
-                .castShadows(true)
-                .build(engine, light)
+        LightManager.Builder(LightManager.Type.FOCUSED_SPOT)
+            .color(255f, 255f, 255f)
+            .falloff(80f)
+            .intensity(3500.0f)
+            .position(0f, 5f, -4f)
+            .spotLightCone(3.14159f / 32f, 3.14159f / 32f + .1f)
+            .castShadows(true)
+            .build(engine, light)
 
         scene.addEntity(light)
     }
